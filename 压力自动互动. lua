@@ -1,0 +1,79 @@
+local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
+
+local INTERACT_PROMPT_TAG = "InteractPromptTag"
+local TRIGGER_INTERVAL = 0.1
+local PROCESS_TIME_BUDGET = 0.005
+
+local prompts = {}
+local promptQueue = {}
+local lastTriggerTime = {}
+local excludedParents = {
+    MonsterLocker = true, Door = true, HighLight = true, Locker = true,
+    EncounterGenerator = true, Generator = true, RotShop = true,
+    puzzle = true, Shop = true, ShopSpawn = true, TricksterDoor = true,
+    LockerUnderwater = true
+}
+
+local function isValidPrompt(prompt)
+    local parent = prompt.Parent
+    if not parent then return false end
+    if excludedParents[parent.Name] then return false end
+    local grandParent = parent.Parent
+    if grandParent and excludedParents[grandParent.Name] then return false end
+    local greatGrandParent = grandParent and grandParent.Parent
+    if greatGrandParent and excludedParents[greatGrandParent.Name] then return false end
+    return true
+end
+
+local function addPrompt(prompt)
+    if prompt:IsA("ProximityPrompt") and isValidPrompt(prompt) then
+        prompts[prompt] = true
+        CollectionService:AddTag(prompt, INTERACT_PROMPT_TAG)
+        table.insert(promptQueue, prompt)
+    end
+end
+
+local function removePrompt(prompt)
+    prompts[prompt] = nil
+    lastTriggerTime[prompt] = nil
+    for i, queuedPrompt in ipairs(promptQueue) do
+        if queuedPrompt == prompt then
+            table.remove(promptQueue, i)
+            break
+        end
+    end
+end
+
+for _, descendant in ipairs(workspace:GetDescendants()) do
+    addPrompt(descendant)
+end
+
+workspace.DescendantAdded:Connect(addPrompt)
+workspace.DescendantRemoving:Connect(removePrompt)
+
+local function processPrompts()
+    local startTime = tick()
+    local promptsProcessed = 0
+    
+    while tick() - startTime < PROCESS_TIME_BUDGET and #promptQueue > 0 do
+        local prompt = table.remove(promptQueue, 1)
+        local currentTime = tick()
+        
+        if prompts[prompt] and (not lastTriggerTime[prompt] or currentTime - lastTriggerTime[prompt] >= TRIGGER_INTERVAL) then
+            task.spawn(function()
+                pcall(fireproximityprompt, prompt)
+            end)
+            lastTriggerTime[prompt] = currentTime
+            promptsProcessed = promptsProcessed + 1
+        end
+        
+        table.insert(promptQueue, prompt)
+    end
+    
+    return promptsProcessed
+end
+
+RunService.Heartbeat:Connect(function()
+    processPrompts()
+end)

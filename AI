@@ -1,0 +1,247 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local shopItems = ReplicatedStorage:WaitForChild("PreRoundShop"):GetChildren()
+
+-- 创建GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ShopGui"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 10
+screenGui.Parent = playerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0.8, 0, 0.8, 0)
+frame.Position = UDim2.new(0.1, 0, 0.1, 0)
+frame.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- 添加标题栏
+local titleBar = Instance.new("TextButton")
+titleBar.Size = UDim2.new(1, 0, 0.06, 0)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+titleBar.Text = "商店"
+titleBar.TextColor3 = Color3.new(1, 1, 1)
+titleBar.TextScaled = true
+titleBar.Parent = frame
+
+-- 关闭按钮
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0.05, 0, 1, 0)
+closeButton.Position = UDim2.new(0.95, 0, 0, 0)
+closeButton.BackgroundColor3 = Color3.new(0.8, 0, 0)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.TextScaled = true
+closeButton.Parent = titleBar
+
+local scrollingFrame = Instance.new("ScrollingFrame")
+scrollingFrame.Size = UDim2.new(1, -20, 0.8, 0)
+scrollingFrame.Position = UDim2.new(0, 10, 0.06, 10)
+scrollingFrame.BackgroundTransparency = 1
+scrollingFrame.ScrollBarThickness = 6
+scrollingFrame.Parent = frame
+
+local totalPriceLabel = Instance.new("TextLabel")
+totalPriceLabel.Size = UDim2.new(0.6, 0, 0.05, 0)
+totalPriceLabel.Position = UDim2.new(0.2, 0, 0.85, 0)  -- 调整位置，避免出界
+totalPriceLabel.BackgroundTransparency = 1
+totalPriceLabel.Text = "总价: 0"
+totalPriceLabel.TextColor3 = Color3.new(1, 1, 1)
+totalPriceLabel.TextScaled = true
+totalPriceLabel.Parent = frame
+
+local purchaseButton = Instance.new("TextButton")
+purchaseButton.Size = UDim2.new(0.6, 0, 0.05, 0)
+purchaseButton.Position = UDim2.new(0.2, 0, 0.9, 0)  -- 调整位置，避免出界
+purchaseButton.BackgroundColor3 = Color3.new(0, 0.7, 0)
+purchaseButton.Text = "购买"
+purchaseButton.TextColor3 = Color3.new(1, 1, 1)
+purchaseButton.TextScaled = true
+purchaseButton.Parent = frame
+
+-- 存储选择的商品
+local selectedItems = {}
+local totalPrice = 0
+
+-- 更新总价
+local function updateTotalPrice()
+    totalPrice = 0
+    for itemName, count in pairs(selectedItems) do
+        for _, item in ipairs(shopItems) do
+            if item.Name == itemName then
+                totalPrice = totalPrice + (item.Value * count)
+                break
+            end
+        end
+    end
+    totalPriceLabel.Text = "总价: " .. totalPrice
+end
+
+-- 创建商品按钮
+local function createItemButton(item, index)
+    local itemFrame = Instance.new("Frame")
+    itemFrame.Size = UDim2.new(0.9, 0, 0, 60)
+    itemFrame.Position = UDim2.new(0.05, 0, 0, (index - 1) * 70)
+    itemFrame.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    itemFrame.Parent = scrollingFrame
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
+    nameLabel.Position = UDim2.new(0, 5, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = item.Name
+    nameLabel.TextColor3 = Color3.new(1, 1, 1)
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.TextScaled = true
+    nameLabel.Parent = itemFrame
+
+    local priceLabel = Instance.new("TextLabel")
+    priceLabel.Size = UDim2.new(0.6, 0, 0.5, 0)
+    priceLabel.Position = UDim2.new(0, 5, 0.5, 0)
+    priceLabel.BackgroundTransparency = 1
+    priceLabel.Text = "价格: " .. item.Value
+    priceLabel.TextColor3 = Color3.new(0.8, 0.8, 0.8)
+    priceLabel.TextXAlignment = Enum.TextXAlignment.Left
+    priceLabel.TextScaled = true
+    priceLabel.Parent = itemFrame
+
+    local minusButton = Instance.new("TextButton")
+    minusButton.Size = UDim2.new(0.1, 0, 1, 0)
+    minusButton.Position = UDim2.new(0.7, 0, 0, 0)
+    minusButton.BackgroundColor3 = Color3.new(0.8, 0, 0)
+    minusButton.Text = "-"
+    minusButton.TextColor3 = Color3.new(1, 1, 1)
+    minusButton.TextScaled = true
+    minusButton.Parent = itemFrame
+
+    local countLabel = Instance.new("TextLabel")
+    countLabel.Size = UDim2.new(0.1, 0, 1, 0)
+    countLabel.Position = UDim2.new(0.8, 0, 0, 0)
+    countLabel.BackgroundTransparency = 1
+    countLabel.Text = "0"
+    countLabel.TextColor3 = Color3.new(1, 1, 1)
+    countLabel.TextScaled = true
+    countLabel.Parent = itemFrame
+
+    local plusButton = Instance.new("TextButton")
+    plusButton.Size = UDim2.new(0.1, 0, 1, 0)
+    plusButton.Position = UDim2.new(0.9, 0, 0, 0)
+    plusButton.BackgroundColor3 = Color3.new(0, 0.8, 0)
+    plusButton.Text = "+"
+    plusButton.TextColor3 = Color3.new(1, 1, 1)
+    plusButton.TextScaled = true
+    plusButton.Parent = itemFrame
+
+    local function updateCount(delta)
+        local count = tonumber(countLabel.Text) + delta
+        count = math.max(count, 0)  -- 确保数量不小于0
+        countLabel.Text = tostring(count)
+        selectedItems[item.Name] = count
+        updateTotalPrice()
+    end
+
+    minusButton.MouseButton1Click:Connect(function()
+        updateCount(-1)
+    end)
+
+    plusButton.MouseButton1Click:Connect(function()
+        updateCount(1)
+    end)
+
+    return itemFrame
+end
+
+-- 创建所有商品按钮
+for i, item in ipairs(shopItems) do
+    createItemButton(item, i)
+end
+
+-- 调整滚动框架的CanvasSize
+scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, #shopItems * 70)
+
+-- 购买功能
+local function purchaseItems()
+    if totalPrice > 0 then
+        local args = {
+            {
+                ["Items"] = selectedItems,
+                ["Batteries"] = 0
+            }
+        }
+        ReplicatedStorage.Events.PreRoundShop:FireServer(unpack(args))
+
+        -- 购买后销毁界面
+        screenGui:Destroy()
+    else
+        -- 显示错误消息
+        local errorMessage = Instance.new("TextLabel")
+        errorMessage.Size = UDim2.new(0.5, 0, 0.1, 0)
+        errorMessage.Position = UDim2.new(0.25, 0, 0.45, 0)
+        errorMessage.BackgroundColor3 = Color3.new(0.8, 0, 0)
+        errorMessage.Text = "请选择商品!"
+        errorMessage.TextColor3 = Color3.new(1, 1, 1)
+        errorMessage.TextScaled = true
+        errorMessage.Parent = frame
+
+        -- 1秒后移除错误消息
+        wait(1)
+        errorMessage:Destroy()
+    end
+end
+
+purchaseButton.MouseButton1Click:Connect(purchaseItems)
+closeButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- 拖动功能
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    local newPosition = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+    frame.Position = newPosition
+end
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        update(input)
+    end
+end)

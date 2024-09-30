@@ -1,0 +1,344 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local COLORS = {
+    BACKGROUND = Color3.new(0.2, 0.2, 0.2),
+    TITLE_BAR = Color3.new(0.1, 0.1, 0.1),
+    BUTTON = Color3.new(0.3, 0.3, 0.3),
+    CLOSE_BUTTON = Color3.new(0.8, 0.2, 0.2),
+    CONFIRM_BUTTON = Color3.new(0, 0.7, 0),
+    TEXT = Color3.new(1, 1, 1)
+}
+
+local GUI_SETTINGS = {
+    MAIN_FRAME_SIZE = UDim2.new(0.4, 0, 0.8, 0),
+    MAIN_FRAME_POSITION = UDim2.new(0.3, 0, 0.1, 0),
+    TITLE_BAR_SIZE = UDim2.new(1, 0, 0.08, 0),
+    BUTTON_SIZE = UDim2.new(0.15, 0, 1, 0),
+    DROPDOWN_SIZE = UDim2.new(0.9, 0, 0.4, 0),
+    ITEM_BUTTON_SIZE = UDim2.new(0.9, 0, 0.1, 0),
+    CONFIRM_BUTTON_SIZE = UDim2.new(0.6, 0, 0.1, 0),
+    MINIMIZED_BUTTON_SIZE = UDim2.new(0, 50, 0, 50)
+}
+
+local function createGuiElement(class, properties)
+    local element = Instance.new(class)
+    for k, v in pairs(properties) do
+        element[k] = v
+    end
+    return element
+end
+
+local function addRoundedCorner(parent, radius)
+    return createGuiElement("UICorner", {
+        CornerRadius = UDim.new(radius, 0),
+        Parent = parent
+    })
+end
+
+local function getItems()
+    local items = {}
+    for _, item in pairs(ReplicatedStorage.EGOGear.EGOGift:GetChildren()) do
+        table.insert(items, item.Name)
+    end
+    table.sort(items)
+    return items
+end
+
+local function getPositions()
+    local positions = {}
+    local egoFolder = player:WaitForChild("EGOFolder")
+    local egoGift = egoFolder:WaitForChild("EGOGift")
+    for _, position in pairs(egoGift:GetChildren()) do
+        table.insert(positions, position.Name)
+    end
+    table.sort(positions)
+    return positions
+end
+
+local function createMainGui()
+    local mainGui = createGuiElement("ScreenGui", {
+        Name = "CustomEGOGiftGUI",
+        ResetOnSpawn = false,
+        Parent = playerGui
+    })
+
+    local mainFrame = createGuiElement("Frame", {
+        Size = GUI_SETTINGS.MAIN_FRAME_SIZE,
+        Position = GUI_SETTINGS.MAIN_FRAME_POSITION,
+        BackgroundColor3 = COLORS.BACKGROUND,
+        BorderSizePixel = 0,
+        Active = true,
+        Parent = mainGui
+    })
+    addRoundedCorner(mainFrame, 0.02)
+
+    return mainGui, mainFrame
+end
+
+local function createTitleBar(parent)
+    local titleBar = createGuiElement("Frame", {
+        Size = GUI_SETTINGS.TITLE_BAR_SIZE,
+        BackgroundColor3 = COLORS.TITLE_BAR,
+        Parent = parent
+    })
+    addRoundedCorner(titleBar, 0.2)
+
+    createGuiElement("TextLabel", {
+        Size = UDim2.new(0.7, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "饰品选择器",
+        TextColor3 = COLORS.TEXT,
+        TextScaled = true,
+        Parent = titleBar
+    })
+
+    local minimizeButton = createGuiElement("TextButton", {
+        Size = GUI_SETTINGS.BUTTON_SIZE,
+        Position = UDim2.new(0.7, 0, 0, 0),
+        BackgroundColor3 = COLORS.BUTTON,
+        Text = "-",
+        TextColor3 = COLORS.TEXT,
+        TextScaled = true,
+        Parent = titleBar
+    })
+
+    local closeButton = createGuiElement("TextButton", {
+        Size = GUI_SETTINGS.BUTTON_SIZE,
+        Position = UDim2.new(0.85, 0, 0, 0),
+        BackgroundColor3 = COLORS.CLOSE_BUTTON,
+        Text = "X",
+        TextColor3 = COLORS.TEXT,
+        TextScaled = true,
+        Parent = titleBar
+    })
+
+    return titleBar, minimizeButton, closeButton
+end
+
+local function createContentFrame(parent)
+    return createGuiElement("Frame", {
+        Size = UDim2.new(1, 0, 0.92, 0),
+        Position = UDim2.new(0, 0, 0.08, 0),
+        BackgroundTransparency = 1,
+        Parent = parent
+    })
+end
+
+local function createDropdown(parent, items, yOffset, onSelect)
+    local dropdown = createGuiElement("ScrollingFrame", {
+        Size = GUI_SETTINGS.DROPDOWN_SIZE,
+        Position = UDim2.new(0.05, 0, yOffset, 0),
+        BackgroundColor3 = COLORS.BUTTON,
+        Visible = false,
+        ScrollBarThickness = 6,
+        Parent = parent
+    })
+    addRoundedCorner(dropdown, 0.05)
+    
+    local UIListLayout = createGuiElement("UIListLayout", {
+        Parent = dropdown,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 5)
+    })
+
+    for i, item in ipairs(items) do
+        local button = createGuiElement("TextButton", {
+            Size = UDim2.new(1, -10, 0, 40),
+            BackgroundColor3 = COLORS.BUTTON,
+            Text = item,
+            TextColor3 = COLORS.TEXT,
+            TextScaled = true,
+            LayoutOrder = i,
+            Parent = dropdown
+        })
+        addRoundedCorner(button, 0.1)
+        
+        button.MouseButton1Click:Connect(function()
+            onSelect(item)
+            dropdown.Visible = false
+        end)
+    end
+    
+    dropdown.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+    
+    return dropdown
+end
+
+local function createItemButton(parent, text, position)
+    local button = createGuiElement("TextButton", {
+        Size = GUI_SETTINGS.ITEM_BUTTON_SIZE,
+        Position = position,
+        BackgroundColor3 = COLORS.BUTTON,
+        Text = text,
+        TextColor3 = COLORS.TEXT,
+        TextScaled = true,
+        Parent = parent
+    })
+    addRoundedCorner(button, 0.1)
+    return button
+end
+
+local function createConfirmButton(parent)
+    local button = createGuiElement("TextButton", {
+        Size = GUI_SETTINGS.CONFIRM_BUTTON_SIZE,
+        Position = UDim2.new(0.2, 0, 0.35, 0),
+        BackgroundColor3 = COLORS.CONFIRM_BUTTON,
+        Text = "确认",
+        TextColor3 = COLORS.TEXT,
+        TextScaled = true,
+        Parent = parent
+    })
+    addRoundedCorner(button, 0.2)
+    return button
+end
+
+local function createMinimizedButton(parent)
+    local button = createGuiElement("TextButton", {
+        Size = GUI_SETTINGS.MINIMIZED_BUTTON_SIZE,
+        Position = UDim2.new(1, -60, 1, -60),
+        AnchorPoint = Vector2.new(1, 1),
+        BackgroundColor3 = COLORS.BACKGROUND,
+        Text = "+",
+        TextColor3 = COLORS.TEXT,
+        TextScaled = true,
+        Visible = false,
+        Parent = parent
+    })
+    addRoundedCorner(button, 0.5)
+    return button
+end
+
+local function setupGUI()
+    local selectedItem = ""
+    local selectedPosition = ""
+    local isMinimized = false
+
+    local mainGui, mainFrame = createMainGui()
+    local titleBar, minimizeButton, closeButton = createTitleBar(mainFrame)
+    local contentFrame = createContentFrame(mainFrame)
+    local minimizedButton = createMinimizedButton(mainGui)
+
+    local itemDropdown = createItemButton(contentFrame, "选择饰品", UDim2.new(0.05, 0, 0.05, 0))
+    local positionDropdown = createItemButton(contentFrame, "选择位置", UDim2.new(0.05, 0, 0.2, 0))
+    local confirmButton = createConfirmButton(contentFrame)
+
+    local items = getItems()
+    local positions = getPositions()
+
+    local itemsDropdown = createDropdown(contentFrame, items, 0.15, function(item)
+        selectedItem = item
+        itemDropdown.Text = item
+    end)
+
+    local positionsDropdown = createDropdown(contentFrame, positions, 0.3, function(position)
+        selectedPosition = position
+        positionDropdown.Text = position
+    end)
+
+    itemDropdown.MouseButton1Click:Connect(function()
+        itemsDropdown.Visible = not itemsDropdown.Visible
+        positionsDropdown.Visible = false
+    end)
+
+    positionDropdown.MouseButton1Click:Connect(function()
+        positionsDropdown.Visible = not positionsDropdown.Visible
+        itemsDropdown.Visible = false
+    end)
+
+    confirmButton.MouseButton1Click:Connect(function()
+        if selectedItem ~= "" and selectedPosition ~= "" then
+            local args = {
+                [1] = selectedItem,
+                [2] = selectedPosition
+            }
+            game:GetService("ReplicatedStorage").Events.ObtainGift:FireServer(unpack(args))
+            StarterGui:SetCore("SendNotification", {
+                Title = "成功",
+                Text = "已装备 " .. selectedItem .. " 到 " .. selectedPosition,
+                Duration = 3
+            })
+        else
+            StarterGui:SetCore("SendNotification", {
+                Title = "错误",
+                Text = "请选择饰品和位置",
+                Duration = 3
+            })
+        end
+    end)
+
+    minimizeButton.MouseButton1Click:Connect(function()
+        mainFrame.Visible = false
+        minimizedButton.Visible = true
+        isMinimized = true
+    end)
+
+    minimizedButton.MouseButton1Click:Connect(function()
+        mainFrame.Visible = true
+        minimizedButton.Visible = false
+        isMinimized = false
+    end)
+
+    closeButton.MouseButton1Click:Connect(function()
+        mainGui:Destroy()
+    end)
+
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            local position = input.Position
+            local guiObjects = playerGui:GetGuiObjectsAtPosition(position.X, position.Y)
+            for _, obj in ipairs(guiObjects) do
+                if obj.Parent == mainFrame then
+                    return
+                end
+            end
+            itemsDropdown.Visible = false
+            positionsDropdown.Visible = false
+        end
+    end)
+
+    local function enableDragging(frame)
+        local dragToggle, dragStart, startPos
+
+        local function updateInput(input)
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, 
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale, 
+                startPos.Y.Offset + delta.Y
+            )
+        end
+
+        frame.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+                dragToggle = true
+                dragStart = input.Position
+                startPos = frame.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragToggle = false
+                    end
+                end)
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                if dragToggle then
+                    updateInput(input)
+                end
+            end
+        end)
+    end
+
+    enableDragging(mainFrame)
+    enableDragging(minimizedButton)
+end
+
+setupGUI()
